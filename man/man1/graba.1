@@ -1,0 +1,38 @@
+.TH graba 1 "27 ago 2017" "version 0.2"
+
+.SH NAME
+graba - caputes the current terminal session into a GIF animation
+
+.SH SINOPSIS
+.B graba
+[--duration <TIME> | -d <TIME>]
+[--wait <TIME> | -w <TIME>]
+[--output <FILE> | -o <FILE>]
+[--title | -t]
+[--help | -h]
+
+.SH OPCIONES
+.TP
+.B --duration, -d
+Sets the recording length in seconds, its default value is 10
+
+.TP
+.B --wait, -w
+Sets a delay in seconds to start recording, the default value is 1.
+
+.TP
+.B --output, -o
+Specifies the output file name, its default value is
+.B cast.gif
+.
+
+.TP
+.B --title, -t
+If present, includes the title bar in the recording
+
+.SH DEPENDENCIAS
+
+.B notify-send xdg-open byzanz xdotool x11-tools
+
+.SH AUTOR
+.I diacus.magnuz@gmail.com
