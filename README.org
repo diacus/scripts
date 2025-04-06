@@ -1,3 +1,14 @@
 #+TITLE: scripts
 
 Personal collection of scripts
+
+* Installation
+By default the scripts are installed in =/opt/bin/= which has to be in
+the =PATH= environment variable, and the man pages (if any) under
+=/opt/man/= check out your [[https://man7.org/linux/man-pages/man5/manpath.5.html][manpath(5)]] configuration for details.
+
+To install simply run the =install.sh= script
+
+#+begin_src shell
+  sh install.sh
+#+end_src

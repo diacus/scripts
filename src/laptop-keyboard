@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# FILE:        laptop-keyboard
+# AUTHOR:      Diacus Magnuz <diacus.magnuz@gmail.com>
+# USAGE:       laptop-keyboard.sh [on|off]
+# DEPENDS:     X11, xinput
+# DESCRIPTION: Enables or disables the laptop keyboard while
+#              running X11 environment
+
+keyboard_descriptor=/tmp/keyboard-descriptor
+action=$1
+
+if test ! -f $keyboard_descriptor
+then
+    xinput list \
+	| grep 'AT Translated Set 2 keyboard' \
+	| sed -e 's/^.*id=\([0-9]\+\).*slave.*\([0-9]\+\).*/\1:\2/' \
+	> $keyboard_descriptor
+fi
+
+kbid=`cut -d : -f 1 < $keyboard_descriptor`
+
+case $action in
+    off)
+	xinput float $kbid
+	;;
+    on)
+	master=`cut -d : -f 2 < $keyboard_descriptor`
+	xinput reattach $kbid $master
+	;;
+    *)
+	script_name=`basename $0`
+	printf "Usage:\n\t${script_name} [on|off]\n" > /dev/stderr
+	;;
+esac
