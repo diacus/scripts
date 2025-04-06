@@ -1,0 +1,3 @@
+#+TITLE: scripts
+
+Personal collection of scripts
