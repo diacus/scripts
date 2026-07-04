@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# FILE:        set-gdm-avatar
+# AUTHOR:      Diacus Magnuz <diacus.magnuz@gmail.com>
+# USAGE:       set-gdm-avatar [usuario]
+# DEPENDS:     sh, awk, install, getent, id, sudo
+# DESCRIPTION: Sets the user avatar (~/.face) as the GDM login-screen
+#              icon via AccountsService, so the gdm user can read it
+#              even when the user's home is not world-traversable
+#              (e.g. 0750). Without an argument it operates on the
+#              real user ($SUDO_USER or $USER), which is useful under
+#              sudo.
+
+# Resolve the target user: explicit arg, else $SUDO_USER, else $USER.
+if [ $# -ge 1 ]; then
+    USER_NAME="$1"
+else
+    USER_NAME="${SUDO_USER:-${USER:-$(id -un)}}"
+fi
+
+if ! id "$USER_NAME" >/dev/null 2>&1; then
+    printf 'ERROR: user %s does not exist\n' "$USER_NAME" >&2
+    exit 1
+fi
+
+HOME_DIR=$(getent passwd "$USER_NAME" | cut -d: -f6)
+SRC="$HOME_DIR/.face"
+ICON_DIR=/var/lib/AccountsService/icons
+DST="$ICON_DIR/$USER_NAME"
+USER_FILE=/var/lib/AccountsService/users/$USER_NAME
+
+if [ ! -f "$SRC" ]; then
+    printf 'ERROR: %s not found\n' "$SRC" >&2
+    exit 1
+fi
+
+echo "==> Current $USER_FILE:"
+if [ -f "$USER_FILE" ]; then cat "$USER_FILE"; else echo "(does not exist yet)"; fi
+echo
+
+if [ -f "$USER_FILE" ]; then
+    cp -a "$USER_FILE" "$USER_FILE.bak"
+    echo "==> Backup: $USER_FILE.bak"
+fi
+
+echo "==> Copying avatar to $DST"
+install -D -m 0644 -o root -g root "$SRC" "$DST"
+
+echo "==> Setting Icon= in $USER_FILE"
+awk -v icon="Icon=$DST" '
+    /^Icon=/ { next }
+    /^\[User\][[:space:]]*$/ { print; print icon; have_user=1; next }
+    { any=1; print }
+    END { if (!have_user) { if (any) print ""; print "[User]"; print icon } }
+' "$USER_FILE" > "$USER_FILE.tmp" && mv "$USER_FILE.tmp" "$USER_FILE"
+
+echo "==> Result:"
+cat "$USER_FILE"
+echo
+echo "Done. Log out to see the avatar on the GDM login screen."

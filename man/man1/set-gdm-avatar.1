@@ -1,0 +1,33 @@
+.TH set-gdm-avatar 1 "4 Jul 2026" "version 0.1"
+
+.SH NAME
+set-gdm-avatar - setea el avatar del usuario en la pantalla de inicio de GDM
+
+.SH SINOPSYS
+.B set-gdm-avatar
+[usuario]
+
+.SH DESCRIPTION
+Copia
+.I ~/.face
+del usuario al almacén de AccountsService
+( /var/lib/AccountsService/icons/<usuario> ) y setea el campo
+.I Icon=
+en /var/lib/AccountsService/users/<usuario>, de modo que GDM \(em que corre
+como el usuario \fIgdm\fR \(em pueda mostrar el avatar aun cuando el home del
+usuario no sea traversable por gdm (p.ej. permisos 0750).
+
+Sin argumento opera sobre el usuario real ( \fI$SUDO_USER\fR o \fI$USER\fR ),
+lo cual es útil al invocarlo bajo
+.BR sudo .
+
+.SH DEPENDENCIES
+.BR sudo ,
+.BR awk ,
+.BR install ,
+.BR getent ,
+.BR id
+
+.SH AUTHOR
+Diacus Magnuz
+.I <diacus.magnuz@gmail.com>
