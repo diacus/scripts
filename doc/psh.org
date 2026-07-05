@@ -1,0 +1,21 @@
+#+TITLE: psh
+#+MAN_CLASS_OPTIONS: :section-id 1
+#+DATE: 11 mar 2018
+#+MAN_VERSION: version 0.1
+#+OPTIONS: ^:{}
+
+* NAME
+psh - Perl SHell
+
+* SYNOPSIS
+#+BEGIN_SRC sh
+psh
+#+END_SRC
+
+A simple REPL for Perl.
+
+* DEPENDENCIES
+perl
+
+* AUTHOR
+Diacus Magnuz <diacus.magnuz@gmail.com>

@@ -1,0 +1,29 @@
+#+TITLE: graba
+#+MAN_CLASS_OPTIONS: :section-id 1
+#+DATE: 27 ago 2017
+#+MAN_VERSION: version 0.2
+#+OPTIONS: ^:{}
+
+* NAME
+graba - captures the current terminal session into a GIF animation
+
+* SYNOPSIS
+#+BEGIN_SRC sh
+graba [--duration <TIME> | -d <TIME>]
+      [--wait <TIME> | -w <TIME>]
+      [--output <FILE> | -o <FILE>]
+      [--title | -t]
+      [--help | -h]
+#+END_SRC
+
+* OPTIONS
+- --duration, -d :: Sets the recording length in seconds, its default value is 10.
+- --wait, -w :: Sets a delay in seconds to start recording, the default value is 1.
+- --output, -o :: Specifies the output file name, its default value is =cast.gif=.
+- --title, -t :: If present, includes the title bar in the recording.
+
+* DEPENDENCIES
+notify-send, xdg-open, byzanz, xdotool, x11-tools
+
+* AUTHOR
+Diacus Magnuz <diacus.magnuz@gmail.com>

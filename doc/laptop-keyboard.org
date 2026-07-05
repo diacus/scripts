@@ -1,0 +1,20 @@
+#+TITLE: laptop-keyboard
+#+MAN_CLASS_OPTIONS: :section-id 1
+#+DATE: 6 Abr 2025
+#+MAN_VERSION: version 0.1
+#+OPTIONS: ^:{}
+
+* NAME
+laptop-keyboard - activa o desactiva el teclado de la laptop (X11)
+
+* SYNOPSIS
+#+BEGIN_SRC sh
+laptop-keyboard [on|off]
+#+END_SRC
+
+* DESCRIPTION
+Controla cuando el teclado de la laptop está conectado o no a su
+dispositivo maestro.
+
+* AUTHOR
+Diacus Magnuz <diacus.magnuz@gmail.com>
