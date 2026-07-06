@@ -1,21 +1,69 @@
 #+TITLE: psh
 #+MAN_CLASS_OPTIONS: :section-id 1
-#+DATE: 11 mar 2018
+#+DATE: 6 Jul 2026
 #+MAN_VERSION: version 0.1
 #+OPTIONS: ^:{}
 
 * NAME
-psh - Perl SHell
+psh - a simple interactive Perl shell (REPL)
 
 * SYNOPSIS
 #+BEGIN_SRC sh
 psh
 #+END_SRC
 
-A simple REPL for Perl.
+* DESCRIPTION
+=psh= is a small Read-Eval-Print loop for Perl. It reads one expression
+per line, evaluates it with the built-in =eval=, and prints the result
+immediately. It is handy for trying out snippets, poking at data
+structures, or inspecting objects from the command line.
+
+Each line is evaluated in the context Perl infers and the return value is
+printed: in list context the elements are joined with ", ", and =undef=
+is shown as the string =undef=. Warnings are enabled. Evaluation errors
+are printed after the result, but the session keeps running.
+
+- Multi-line input :: A line ending in a backslash (=\\=) is joined with
+  the next one before evaluation; the prompt changes to =Per>>= until the
+  expression is complete.
+- Inspecting data :: The =show= helper runs =Data::Dumper= on its
+  arguments and prints the dump. Because the REPL also echoes the return
+  value of every expression, a call like =show([1,2,3])= is followed by a
+  trailing =1= (the success return of =print=); this is expected.
+  #+BEGIN_SRC sh
+  show([1, 2, 3])
+  show(\%ENV)
+  #+END_SRC
+- Paged output :: When the result spans more than 30 lines it is piped
+  through =less= automatically.
+- Exiting :: Send end-of-file (=Ctrl-D=) to leave the shell.
+
+* EXAMPLES
+An interactive session:
+#+BEGIN_SRC sh
+$ psh
+Perl> 2 + 2
+4
+Perl> "foo", undef, 42
+foo, undef, 42
+Perl> my @a = (1, 2, 3); \@a
+ARRAY(0x64046058b1a8)
+Perl> show([1, 2, 3])
+$VAR1 = [
+          1,
+          2,
+          3
+        ];
+1
+Perl> 1 + \
+Per>> 2
+3
+Perl> <Ctrl-D>
+#+END_SRC
 
 * DEPENDENCIES
-perl, less
+=perl= (with the core modules =Term::ReadLine= and =Data::Dumper=) and
+=less=.
 
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>
