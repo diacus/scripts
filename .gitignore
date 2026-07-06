@@ -1,2 +1,4 @@
 *~
 man/man*/
+build/
+*.deb

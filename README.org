@@ -3,12 +3,34 @@
 Personal collection of scripts
 
 * Installation
-By default the scripts are installed in =/opt/bin/= which has to be in
-the =PATH= environment variable, and the man pages (if any) under
-=/opt/man/= check out your [[https://man7.org/linux/man-pages/man5/manpath.5.html][manpath(5)]] configuration for details.
+The scripts are distributed as a Debian package.  The scripts install
+under =/usr/local/bin/= and the man pages under
+=/usr/local/share/man/= (see [[https://man7.org/linux/man-pages/man5/manpath.5.html][manpath(5)]] for details on how man finds
+them).
 
-To install simply run the =install.sh= script
+Building the package regenerates the man pages from =doc/*.org= via
+=tools/build-man.el=, so =emacs= must be on =PATH= at build time.
+
+To build the =.deb= run:
 
 #+begin_src shell
-  sh install.sh
+  sh build-deb.sh
+#+end_src
+
+This produces =scripts_1.0_all.deb= in the repo root.  Install it with:
+
+#+begin_src shell
+  sudo dpkg -i scripts_1.0_all.deb
+#+end_src
+
+or with =apt=, which resolves the runtime dependencies:
+
+#+begin_src shell
+  sudo apt install ./scripts_1.0_all.deb
+#+end_src
+
+To remove the package:
+
+#+begin_src shell
+  sudo dpkg -r scripts
 #+end_src
