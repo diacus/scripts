@@ -12,10 +12,11 @@ install_scripts () {
 }
 
 # Regenerate groff man pages from the org sources in doc/ using ox-man
-# (Emacs). The man/man1/*.1 files are build artifacts, gitignored.
+# (Emacs). The man/man<sect>/*.<sect> files are build artifacts, gitignored;
+# the section <sect> is discovered from each doc's MAN_CLASS_OPTIONS
+# :section-id keyword by tools/build-man.el.
 build_manpages () {
-    rm -f man/man1/*.1
-    mkdir -p man/man1
+    rm -rf man
     if ! command -v emacs >/dev/null 2>&1
     then
 	echo "warning: emacs not found; man pages not rebuilt from doc/*.org" >&2
