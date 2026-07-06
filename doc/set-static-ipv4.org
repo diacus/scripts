@@ -1,0 +1,43 @@
+#+TITLE: set-static-ipv4
+#+MAN_CLASS_OPTIONS: :section-id 1
+#+DATE: 5 Jul 2025
+#+MAN_VERSION: version 0.1
+#+OPTIONS: ^:{}
+
+* NAME
+set-static-ipv4 - asigna una IP estática a conexiones WiFi por patrón
+
+* SYNOPSIS
+#+BEGIN_SRC sh
+set-static-ipv4 <ip-address> <ssid-pattern>
+#+END_SRC
+
+* DESCRIPTION
+Descubre las conexiones de NetworkManager cuyo nombre coincide con el
+patrón glob =<ssid-pattern>= y configura cada una con una dirección IPv4
+estática. Para cada conexión coincidente establece:
+
+- =ipv4.method manual=
+- =ipv4.addresses <ip-address>/24=
+- =ipv4.gateway 192.168.100.1=
+- =ipv4.dns 192.168.100.2=
+- =ipv6.ignore-auto-dns yes=
+- =ipv6.dns 2806:2f0:5341:f465:26aa:1dfa:32f9:92f4=
+
+El patrón sigue la sintaxis glob del shell (='*'=, ='?'=, ='[...]'=). Por
+ejemplo, ='RYUK*'= coincide con =RYUK=, =RYUK-5G= y =RYUK_EXT=.
+
+Si ninguna conexión coincide con el patrón, se imprime un aviso en la
+salida de error y el script termina con estado distinto de cero.
+
+* OPTIONS
+- -- <ip-address> :: Dirección IPv4 estática a asignar (sin prefijo de
+     red; se aplica =/24=).
+- -- <ssid-pattern> :: Patrón glob para seleccionar las conexiones por
+     nombre.
+
+* DEPENDENCIES
+- =nmcli= (NetworkManager)
+
+* AUTHOR
+Diacus Magnuz <diacus.magnuz@gmail.com>

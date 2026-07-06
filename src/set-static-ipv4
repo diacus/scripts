@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# FILE:        set-static-ipv4
+# AUTHOR:      Diacus Magnuz <diacus.magnuz@gmail.com>
+# USAGE:       set-static-ipv4 <ip-address> <ssid-pattern>
+# DEPENDS:     NetworkManager (nmcli)
+# DESCRIPTION: Sets a static IPv4 address on every NetworkManager
+#              connection whose name matches the glob <ssid-pattern>.
+
+ip_address=$1
+ssid_pattern=$2
+
+if test -z "$ip_address" || test -z "$ssid_pattern"
+then
+    script_name=`basename $0`
+    printf "Usage:\n\t${script_name} <ip-address> <ssid-pattern>\n" > /dev/stderr
+    exit 1
+fi
+
+count=0
+for name in `nmcli -t -f NAME connection show`
+do
+    case "$name" in
+	$ssid_pattern)
+	    nmcli connection modify "$name" ipv4.method manual \
+		 ipv4.addresses "${ip_address}/24" \
+		 ipv4.gateway 192.168.100.1 \
+		 ipv4.dns 192.168.100.2 \
+		 ipv6.ignore-auto-dns yes \
+		 ipv6.dns 2806:2f0:5341:f465:26aa:1dfa:32f9:92f4
+	    count=$((count + 1))
+	    ;;
+    esac
+done
+
+if test "$count" -eq 0
+then
+    printf 'set-static-ipv4: no connection matched pattern "%s"\n' \
+	"$ssid_pattern" > /dev/stderr
+    exit 1
+fi
