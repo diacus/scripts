@@ -4,6 +4,7 @@
 #   make deb    build the .deb package (scripts_1.0_all.deb)
 #   make man    regenerate groff man pages from doc/*.org for review
 #   make test   run the test suite (no install, root, or display required)
+#               pass through flags with TESTARGS, e.g. `make test TESTARGS=-v`
 #   make clean  remove build artifacts (build/, man/, *.deb)
 #
 # man/manN/* and build/ are gitignored build artifacts; doc/*.org are the
@@ -35,8 +36,10 @@ man: $(DOCS) tools/build-man.el
 	@echo "man pages regenerated under man/"
 
 # Run the TAP test suite straight from src/ (no install needed).
+# Extra flags (e.g. -v for verbose TAP) can be passed via TESTARGS:
+#   make test TESTARGS=-v
 test: $(SRCS)
-	sh test/run.sh
+	sh test/run.sh $(TESTARGS)
 
 # Remove every build artifact.
 clean:
