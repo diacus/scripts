@@ -23,7 +23,7 @@ graba [--duration <TIME> | -d <TIME>]
 - --title, -t :: If present, includes the title bar in the recording.
 
 * DEPENDENCIES
-notify-send, xdg-open, byzanz, xdotool, x11-tools
+byzanz, xdotool, xwininfo, notify-send, xdg-open
 
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>

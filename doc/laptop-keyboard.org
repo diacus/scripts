@@ -16,5 +16,8 @@ laptop-keyboard [on|off]
 Controla cuando el teclado de la laptop está conectado o no a su
 dispositivo maestro.
 
+* DEPENDENCIES
+xinput (X11)
+
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>

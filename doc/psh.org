@@ -15,7 +15,7 @@ psh
 A simple REPL for Perl.
 
 * DEPENDENCIES
-perl
+perl, less
 
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>

@@ -30,7 +30,7 @@ build_manpages () {
 	echo "error: emacs not found; cannot rebuild man pages from doc/*.org" >&2
 	exit 1
     fi
-    emacs --batch -l tools/build-man.el
+    emacs --batch -Q -l tools/build-man.el
 }
 
 assemble_tree () {
@@ -63,7 +63,7 @@ Section: utils
 Priority: optional
 Architecture: $arch
 Maintainer: Diacus Magnuz <diacus.magnuz@gmail.com>
-Depends: perl, network-manager, byzanz, xdotool, x11-utils, libnotify-bin, xdg-utils
+Depends: perl, less, sudo, xinput, network-manager, byzanz, xdotool, x11-utils, libnotify-bin, xdg-utils
 Description: Personal collection of standalone CLI scripts
  POSIX sh and Perl utility scripts with companion man pages built
  from org-mode sources.
