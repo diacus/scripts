@@ -63,7 +63,7 @@ Section: utils
 Priority: optional
 Architecture: $arch
 Maintainer: Diacus Magnuz <diacus.magnuz@gmail.com>
-Depends: perl, less, sudo, xinput, network-manager, byzanz, xdotool, x11-utils, libnotify-bin, xdg-utils
+Depends: perl, less, sudo, xinput, network-manager, byzanz, xdotool, x11-utils, libnotify-bin, xdg-utils, ffmpeg, slurp, wf-recorder, libglib2.0-bin
 Description: Personal collection of standalone CLI scripts
  POSIX sh and Perl utility scripts with companion man pages built
  from org-mode sources.

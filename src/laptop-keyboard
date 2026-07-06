@@ -2,34 +2,125 @@
 #
 # FILE:        laptop-keyboard
 # AUTHOR:      Diacus Magnuz <diacus.magnuz@gmail.com>
-# USAGE:       laptop-keyboard.sh [on|off]
-# DEPENDS:     X11, xinput
-# DESCRIPTION: Enables or disables the laptop keyboard while
-#              running X11 environment
+# USAGE:       laptop-keyboard [--backend {x11,wayland}] [on|off]
+# DEPENDS:     x11: xinput | wayland: awk, kernel >= 5.10 (sysfs inhibited), root
+# DESCRIPTION: Enables or disables the laptop keyboard.  The backend is
+#              auto-detected from $XDG_SESSION_TYPE; override with --backend.
+#                x11     -> xinput float/reattach
+#                wayland -> kernel sysfs "inhibited" attribute
+#                           (/sys/.../input/inputN/inhibited), compositor
+#                           agnostic, requires root and kernel >= 5.10.
 
-keyboard_descriptor=/tmp/keyboard-descriptor
-action=$1
+keyboard_descriptor=${LAPTOP_KB_DESCRIPTOR:-/tmp/keyboard-descriptor}
+inhibited_cache=${LAPTOP_KB_CACHE:-/tmp/keyboard-inhibited-path}
+action=
+backend=auto
 
-if test ! -f $keyboard_descriptor
-then
-    xinput list \
-	| grep 'AT Translated Set 2 keyboard' \
-	| sed -e 's/^.*id=\([0-9]\+\).*slave.*\([0-9]\+\).*/\1:\2/' \
-	> $keyboard_descriptor
-fi
+# Parse args: pull out --backend, keep on|off as the action.
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --backend)    shift; backend="$1"; shift ;;
+        --backend=*)  backend="${1#--backend=}"; shift ;;
+        on|off)       action="$1"; shift ;;
+        *)            printf 'laptop-keyboard: unknown argument: %s\n' "$1" >&2
+                      exit 2 ;;
+    esac
+done
 
-kbid=`cut -d : -f 1 < $keyboard_descriptor`
+resolve_backend () {
+    case "$backend" in
+        x11|wayland) ;;
+        auto)
+            backend="${XDG_SESSION_TYPE:-}"
+            case "$backend" in
+                x11|wayland) ;;
+                *) printf 'laptop-keyboard: cannot determine session (XDG_SESSION_TYPE=%s)\n' \
+                       "${backend:-<empty>}" >&2
+                   exit 1 ;;
+            esac ;;
+        *) printf 'laptop-keyboard: --backend must be x11 or wayland (got %s)\n' \
+               "$backend" >&2
+           exit 2 ;;
+    esac
+}
 
-case $action in
-    off)
-	xinput float $kbid
-	;;
-    on)
-	master=`cut -d : -f 2 < $keyboard_descriptor`
-	xinput reattach $kbid $master
-	;;
-    *)
-	script_name=`basename $0`
-	printf "Usage:\n\t${script_name} [on|off]\n" > /dev/stderr
-	;;
+# Resolve the sysfs "inhibited" path of the internal keyboard from
+# /proc/bus/input/devices (same device name the xinput path greps for).
+find_inhibited_path () {
+    awk -v target="AT Translated Set 2 keyboard" \
+        -v root="${LAPTOP_KB_SYSROOT:-/sys}" '
+        $1=="N:" { name=$0; sub(/^N: Name=/,"",name); gsub(/^"|"$/,"",name) }
+        $1=="S:" { sysfs=$0; sub(/^S: Sysfs=/,"",sysfs) }
+        $0==""   { if (name==target && sysfs!="") { print root sysfs "/inhibited"; done=1 }
+                   name=""; sysfs="" }
+        END      { if (!done && name==target && sysfs!="") print root sysfs "/inhibited" }
+    ' "${LAPTOP_KB_DEVICES:-/proc/bus/input/devices}"
+}
+
+do_x11 () {
+    if test ! -f "$keyboard_descriptor"
+    then
+        xinput list \
+            | grep 'AT Translated Set 2 keyboard' \
+            | sed -e 's/^.*id=\([0-9]\+\).*slave.*\([0-9]\+\).*/\1:\2/' \
+            > "$keyboard_descriptor"
+    fi
+
+    kbid=`cut -d : -f 1 < "$keyboard_descriptor"`
+
+    case "$action" in
+        off)
+            xinput float $kbid
+            ;;
+        on)
+            master=`cut -d : -f 2 < "$keyboard_descriptor"`
+            xinput reattach $kbid $master
+            ;;
+    esac
+}
+
+do_wayland () {
+    if [ "$(id -u)" != 0 ] && [ -z "$LAPTOP_KB_SYSROOT" ]; then
+        printf 'laptop-keyboard: wayland backend requires root (run with sudo)\n' >&2
+        exit 1
+    fi
+
+    path=
+    if [ -f "$inhibited_cache" ]; then
+        cached=`cat "$inhibited_cache"`
+        if [ -w "$cached" ]; then path="$cached"; fi
+    fi
+
+    if [ -z "$path" ]; then
+        path=`find_inhibited_path`
+        if [ -z "$path" ]; then
+            printf 'laptop-keyboard: no "AT Translated Set 2 keyboard" in /proc/bus/input/devices\n' >&2
+            exit 1
+        fi
+        if [ ! -w "$path" ]; then
+            printf 'laptop-keyboard: %s not writable (kernel < 5.10 without inhibited attribute?)\n' \
+                "$path" >&2
+            exit 1
+        fi
+        echo "$path" > "$inhibited_cache"
+    fi
+
+    case "$action" in
+        off) echo 1 > "$path" ;;
+        on)  echo 0 > "$path" ;;
+    esac
+}
+
+resolve_backend
+
+case "$action" in
+    off|on) ;;
+    *) printf 'Usage:\n\tlaptop-keyboard [--backend {x11,wayland}] [on|off]\n' > /dev/stderr
+       exit 2 ;;
 esac
+
+if [ "$backend" = x11 ]; then
+    do_x11
+else
+    do_wayland
+fi

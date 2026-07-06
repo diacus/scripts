@@ -60,6 +60,49 @@ x11-utils, libnotify-bin, xdg-utils). Remove with `dpkg -r scripts`.
   via `xinput` (float/reattach). Caches the device id in
   `/tmp/keyboard-descriptor`.
 
+## Testing
+The test suite runs the scripts straight from `src/` — no install, root,
+display, or hardware required. It uses TAP (Test Anything Protocol) with
+`prove` (Perl core, no new dependency) as the runner, and mocks every
+external tool so the scripts' real side effects never fire.
+
+```sh
+sh test/run.sh          # run all tests; exit 0 on success
+sh test/run.sh -v       # verbose TAP output
+prove test/             # equivalent
+```
+
+- `test/run.sh` — wrapper that `exec prove "$@" test/*.t`.
+- `test/lib/tap.sh` — POSIX sh TAP helpers (`plan`, `is`, `contains`,
+  `matches`, `expect_exit`, `expect_ok`, `expect_fail`, `skip`).
+- `test/lib/mock.sh` — `make_mock_bin DIR NAME` builds a mock binary that
+  records its argv to `DIR/NAME.calls`, prints `DIR/NAME.out` if present,
+  and exits with `DIR/NAME.exit`. `path_prepend DIR` puts it on `PATH`.
+- `test/*.t` — one per script, executable, shebang `#!/bin/sh`.
+
+A few scripts had hard-coded paths or root/display assumptions that made
+them untestable as-is. They grew lightweight **env-hook** overrides so the
+tests can redirect them at temp dirs; **the hooks default to the original
+values, so normal use is unchanged**:
+
+- `graba`: `GRABA_PREFIX` (tools under `$prefix/bin`, default `/usr`),
+  `GRABA_WAIT_CHILD` (parent waits for the recording child, defeating the
+  fork fire-and-forget race during tests).
+- `set-gdm-avatar`: `ACCOUNTSSERVICE_DIR` (default
+  `/var/lib/AccountsService`).
+- `laptop-keyboard`: `LAPTOP_KB_DESCRIPTOR`, `LAPTOP_KB_CACHE`,
+  `LAPTOP_KB_DEVICES`, `LAPTOP_KB_SYSROOT` (default `/tmp/...`, `/proc/bus/
+  input/devices`, `/sys`); when `LAPTOP_KB_SYSROOT` is set, the Wayland
+  root check is bypassed so the test can drive a synthetic sysfs tree.
+
+`psh` is an interactive REPL (`Term::ReadLine` needs a controlling tty),
+so its functional tests run under a pty allocated by `script(1)`; if
+`script` is unavailable those subtests are skipped, and a plain
+`perl -c -w` compile check still runs.
+
+`test/` is committed but **not packaged**: `build-deb.sh` only stages
+`src/` and `man/`, so the `.deb` contains no test files.
+
 ## Adding a new script
 1. Write the executable script at `src/<name>` (`chmod +x`; shebang
    `#!/bin/sh` or `#!/usr/bin/env perl` as appropriate).
@@ -88,4 +131,4 @@ x11-utils, libnotify-bin, xdg-utils). Remove with `dpkg -r scripts`.
    (ox-man's own template cannot emit date/version, so `tools/build-man.el`
    rewrites the `.TH` line after export).
 3. Re-run `sh build-deb.sh` and `sudo dpkg -i scripts_1.0_all.deb` to
-   deploy. There is nothing else to build or test.
+   deploy. Optionally add `test/<name>.t` and run `sh test/run.sh`.

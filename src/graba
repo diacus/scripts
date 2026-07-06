@@ -1,26 +1,29 @@
 #!/usr/bin/perl -w
 # ===========================================================================
 # FILE        : graba
-# DESCRIPTION : Records the current terminal session
+# DESCRIPTION : Records the current terminal session (X11, GNOME/Wayland,
+#               wlroots) into a GIF animation
 # AUTHOR      : @diacus (diacus.magnuz@gmail.com)
-# LAST CHANGE : dom ago 27 12:36:45 CDT 2017
+# LAST CHANGE : 5 Jul 2026
 # CREATION    : sáb ago 12 16:16:35 CDT 2017
-# VERSION     : 0.1
+# VERSION     : 0.3
 # ===========================================================================
 
 use strict;
 use File::Basename;
 use File::Spec;
 use Getopt::Long;
+use JSON::PP;
 
-my $prefix = '/usr';
+my $prefix = $ENV{GRABA_PREFIX} // '/usr';
 
 # Arguments
 my $duration       = 10;
 my $delay          = 1;
 my $cast           = "$ENV{PWD}/cast.gif";
 my $help           = undef;
-my $show_title = undef;
+my $show_title     = undef;
+my $backend        = 'auto';
 my $title;
 
 # Tools
@@ -30,14 +33,20 @@ my $open     = "$prefix/bin/xdg-open";
 my $recorder = "$prefix/bin/byzanz-record";
 my $xdotool  = "$prefix/bin/xdotool";
 my $xwininfo = "$prefix/bin/xwininfo";
-my @tools    = ($notify, $recorder, $xdotool, $xwininfo, $open);
+my $gdbus    = "$prefix/bin/gdbus";
+my $ffmpeg   = "$prefix/bin/ffmpeg";
+my $wfreq    = "$prefix/bin/wf-recorder";
+my $slurp    = "$prefix/bin/slurp";
+my $hyprctl  = "$prefix/bin/hyprctl";
+my $swaymsg  = "$prefix/bin/swaymsg";
 
 sub show_help
 {
   my $self     = basename($0);
   my $message  = "USAGE:\n";
   my @opciones = ( '',
-    "[--duration=<TIME>] [--wait=<TIME>] [--output=<FILE>] [--title]",
+    "[--backend {x11,gnome,wlroots}] [--duration=<TIME>] [--wait=<TIME>]",
+    "                [--output=<FILE>] [--title]",
     "[-d <TIME>] [-w <TIME>] [-o <FILE>] [-t]",
     "[-h]",
   );
@@ -73,11 +82,228 @@ sub quiet
   *STDOUT = *NULO;
 }
 
+# Capture the stdout of a command (list form, no shell).
+sub capture
+{
+  my @cmd = @_;
+  open(my $fh, '-|', @cmd) or die "$0: no se pudo ejecutar @cmd: $!";
+  local $/;
+  my $out = <$fh>;
+  close($fh);
+  return defined $out ? $out : '';
+}
+
+# Resolve the recording backend from --backend or the session environment.
+sub resolve_backend
+{
+  my $b = $backend;
+  return $b unless $b eq 'auto';
+
+  my $st = $ENV{XDG_SESSION_TYPE} // '';
+  return 'x11' if $st eq 'x11';
+  unless ($st eq 'wayland')
+  {
+    die "$0: no se pudo determinar la sesion (XDG_SESSION_TYPE=" .
+      ($st eq '' ? 'vacio' : "'$st'") . ")\n";
+  }
+
+  my $desk = $ENV{XDG_CURRENT_DESKTOP} // '';
+  for my $d (split /:/, $desk)
+  {
+    return 'gnome'  if $d =~ /^(gnome|ubuntu|gnome-flashback)$/i;
+    die  "$0: KDE Wayland no soportado: no hay grabador CLI en apt\n"
+      if $d =~ /^(kde|plasma)$/i;
+  }
+  # wlroots compositors (sway, hyprland, river, wayfire, ...) and any
+  # other wayland session fall through to the wlroots backend.
+  return 'wlroots';
+}
+
+# External tools required by each backend (besides the common ones).
+sub tools_for
+{
+  my $b = shift;
+  my @common = ($notify, $open);
+  return ($recorder, $xdotool, $xwininfo, @common) if $b eq 'x11';
+  return ($gdbus, $ffmpeg, @common)                if $b eq 'gnome';
+  return ($wfreq, $slurp, $ffmpeg, @common)        if $b eq 'wlroots';
+  die "$0: backend desconocido '$b'\n";
+}
+
+sub make_tmp_dir
+{
+  my $d = `mktemp -d /tmp/graba.XXXXXX`;
+  chomp $d;
+  return $d;
+}
+
+# Two-pass GIF encoding (palettegen + paletteuse).
+sub video_to_gif
+{
+  my ($src, $dst) = @_;
+  my $palette = "$src.palette.png";
+  system($ffmpeg, '-y', '-i', $src, '-vf', 'palettegen', '-an', $palette);
+  system($ffmpeg, '-y', '-i', $src, '-i', $palette,
+         '-filter_complex', 'paletteuse', '-an', $dst);
+  unlink $palette;
+}
+
+# Find the focused node in a sway tree.
+sub find_focused
+{
+  my $n = shift;
+  return undef unless ref $n eq 'HASH';
+  return $n if $n->{focused};
+  for my $v (values %$n)
+  {
+    if (ref $v eq 'HASH')
+    {
+      my $r = find_focused($v); return $r if $r;
+    }
+    elsif (ref $v eq 'ARRAY')
+    {
+      for my $c (@$v)
+      {
+        my $r = find_focused($c); return $r if $r;
+      }
+    }
+  }
+  return undef;
+}
+
+# Active window geometry for wlroots: "x,y wxh" (what wf-recorder -g expects).
+sub wlr_geometry
+{
+  if (-x $hyprctl)
+  {
+    my $d = eval { JSON::PP->new->decode(capture($hyprctl, 'activewindow', '-j')) };
+    if (ref $d eq 'HASH' && ref $d->{at} eq 'ARRAY' && ref $d->{size} eq 'ARRAY')
+    {
+      my ($x, $y) = @{$d->{at}};
+      my ($w, $h) = @{$d->{size}};
+      return "$x,$y ${w}x${h}" if defined $x && defined $w;
+    }
+  }
+  if (-x $swaymsg)
+  {
+    my $d = eval { JSON::PP->new->decode(capture($swaymsg, '-t', 'get_tree')) };
+    my $n = find_focused($d);
+    if ($n && ref $n->{rect} eq 'HASH')
+    {
+      my $r = $n->{rect};
+      return "$r->{x},$r->{y} $r->{width}x$r->{height}"
+        if defined $r->{x} && defined $r->{width};
+    }
+  }
+  # Fallback: interactive region selection.
+  my $g = capture($slurp);
+  chomp $g;
+  return $g;
+}
+
+sub record_x11
+{
+  my $winid   = `$xdotool getactivewindow`;
+  my @wininfo = `$xwininfo -id $winid`;
+
+  my $line;
+  my @buffer;
+  my ($w, $h, $x, $y);
+
+  @buffer = grep(/Width:/, @wininfo);
+  $line   = shift @buffer;
+  $line   =~ m/Width: (\d+)/;
+  $w = $1;
+
+  @buffer = grep(/Height:/, @wininfo);
+  $line = shift @buffer;
+  $line =~ m/Height: (\d+)/;
+  $h = $1 + $title;
+
+  @buffer = grep(/Corners:/, @wininfo);
+  $line = shift @buffer;
+  $line =~ m/Corners:\s+\+(\d+)\+(\d+)/;
+  $x = $1;
+  $y = $2 - $title;
+
+  sleep($delay);
+  popup_notification('Reconfding starts');
+  system("$recorder -d $duration -w $w -h $h -x $x -y $y $cast");
+  popup_notification('Recording has finished');
+  sleep(1);
+  system("$open $cast");
+}
+
+sub record_gnome
+{
+  my $tmpd = make_tmp_dir();
+  my $tmpl = "$tmpd/graba";
+
+  sleep($delay);
+  popup_notification('Recording starts');
+
+  my $out = capture($gdbus, 'call', '--session',
+    '--dest', 'org.gnome.Shell',
+    '--object-path', '/org/gnome/Shell/Screencast',
+    '--method', 'org.gnome.Shell.Screencast.Screencast',
+    $tmpl, '@a{sv} {}');
+
+  my $webm;
+  if ($out =~ /\((true|false),\s*'([^']+)'\)/)
+  {
+    die "$0: org.gnome.Shell.Screencast.Screencast fallo: $out\n" if $1 eq 'false';
+    $webm = $2;
+  }
+  else
+  {
+    die "$0: no se pudo interpretar la respuesta de gdbus: $out\n";
+  }
+
+  sleep($duration);
+  system($gdbus, 'call', '--session',
+    '--dest', 'org.gnome.Shell',
+    '--object-path', '/org/gnome/Shell/Screencast',
+    '--method', 'org.gnome.Shell.Screencast.StopScreencast');
+
+  popup_notification('Recording has finished');
+  video_to_gif($webm, $cast);
+  sleep(1);
+  system($open, $cast);
+}
+
+sub record_wlroots
+{
+  my $geom  = wlr_geometry();
+  my $tmpd  = make_tmp_dir();
+  my $video = "$tmpd/graba.mp4";
+
+  sleep($delay);
+  popup_notification('Recording starts');
+
+  my $pid = fork();
+  die "$0: fork: $!\n" unless defined $pid;
+  if ($pid == 0)
+  {
+    exec($wfreq, '-g', $geom, '-f', $video)
+      or die "$0: exec wf-recorder: $!\n";
+  }
+
+  sleep($duration);
+  kill('INT', $pid);
+  waitpid($pid, 0);
+
+  popup_notification('Recording has finished');
+  video_to_gif($video, $cast);
+  sleep(1);
+  system($open, $cast);
+}
+
 GetOptions(
   'duration=i' => \$duration,
   'wait=i'     => \$delay,
   'output=s'   => \$cast,
   'help'       => \$help,
+  'backend=s'  => \$backend,
   'title!'     => \$show_title) or show_help;
 
 if (defined($help))
@@ -95,7 +321,9 @@ else
   $title = 0;
 }
 
-foreach my $tool (@tools)
+$backend = resolve_backend();
+
+foreach my $tool (tools_for($backend))
 {
   unless (-x $tool)
   {
@@ -104,46 +332,19 @@ foreach my $tool (@tools)
 }
 
 my $outdir = dirname($cast);
-
 die "No se puede escribir en $outdir" unless (-w $outdir);
 
-# Determina el área de captura
-my $winid    = `$xdotool getactivewindow`;
-my @wininfo  = `$xwininfo -id $winid`;
-
-my $line;
-my @buffer;
-my $command;
-my ($w, $h, $x, $y);
-
-@buffer = grep(/Width:/, @wininfo);
-$line   = shift @buffer;
-$line   =~ m/Width: (\d+)/;
-$w = $1;
-
-@buffer = grep(/Height:/, @wininfo);
-$line = shift @buffer;
-$line =~ m/Height: (\d+)/;
-$h = $1 + $title;
-
-@buffer = grep(/Corners:/, @wininfo);
-$line = shift @buffer;
-$line =~ m/Corners:\s+\+(\d+)\+(\d+)/;
-$x = $1;
-$y = $2 - $title;
-
-if (fork())
+my $child = fork();
+if ($child)
 {
   system("clear");
+  waitpid($child, 0) if $ENV{GRABA_WAIT_CHILD};
 }
 else
 {
   quiet();
-  sleep($delay);
-
-  popup_notification('Reconfding starts');
-  system("$recorder -d $duration -w $w -h $h -x $x -y $y $cast");
-  popup_notification('Recording has finished');
-  sleep(1);
-  system("$open $cast");
+  record_x11()     if $backend eq 'x11';
+  record_gnome()   if $backend eq 'gnome';
+  record_wlroots() if $backend eq 'wlroots';
+  exit 0;
 }

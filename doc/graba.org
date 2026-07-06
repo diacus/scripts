@@ -1,7 +1,7 @@
 #+TITLE: graba
 #+MAN_CLASS_OPTIONS: :section-id 1
-#+DATE: 27 ago 2017
-#+MAN_VERSION: version 0.2
+#+DATE: 5 Jul 2026
+#+MAN_VERSION: version 0.3
 #+OPTIONS: ^:{}
 
 * NAME
@@ -9,21 +9,46 @@ graba - captures the current terminal session into a GIF animation
 
 * SYNOPSIS
 #+BEGIN_SRC sh
-graba [--duration <TIME> | -d <TIME>]
+graba [--backend {x11,gnome,wlroots}]
+      [--duration <TIME> | -d <TIME>]
       [--wait <TIME> | -w <TIME>]
       [--output <FILE> | -o <FILE>]
       [--title | -t]
       [--help | -h]
 #+END_SRC
 
+* DESCRIPTION
+Records the current terminal session into a GIF animation. The recording
+backend is auto-detected from =$XDG_SESSION_TYPE= and
+=$XDG_CURRENT_DESKTOP=; use =--backend= to override.
+
+- X11 :: records the active terminal window (geometry obtained via
+     =xdotool= and =xwininfo=) with =byzanz-record=.
+- GNOME (Wayland) :: records the whole screen through the
+     =org.gnome.Shell.Screencast= D-Bus interface and converts the
+     resulting WebM to GIF with =ffmpeg=. Wayland does not expose a
+     portable active-window geometry, so the full screen is captured.
+- wlroots (Wayland: Sway, Hyprland, ...) :: records the active window
+     (geometry discovered via =hyprctl= or =swaymsg=, or an interactive
+     =slurp= region as fallback) with =wf-recorder= and converted to GIF
+     with =ffmpeg=.
+
+KDE/Wayland is not supported: there is no CLI screen recorder available
+in apt (only GUI recorders). =--title= is ignored under Wayland.
+
 * OPTIONS
 - --duration, -d :: Sets the recording length in seconds, its default value is 10.
 - --wait, -w :: Sets a delay in seconds to start recording, the default value is 1.
 - --output, -o :: Specifies the output file name, its default value is =cast.gif=.
-- --title, -t :: If present, includes the title bar in the recording.
+- --title, -t :: If present, includes the title bar in the recording (X11 only; ignored under Wayland).
+- --backend :: Force the recording backend: =x11=, =gnome=, or =wlroots=. By default the backend is auto-detected from =$XDG_SESSION_TYPE= and =$XDG_CURRENT_DESKTOP=.
 
 * DEPENDENCIES
-byzanz, xdotool, xwininfo, notify-send, xdg-open
+Common to every backend: =notify-send=, =xdg-open=.
+
+- X11 :: =byzanz=, =xdotool=, =xwininfo=.
+- GNOME (Wayland) :: =gdbus= (libglib2.0-bin), =ffmpeg=, =gnome-shell=.
+- wlroots (Wayland) :: =wf-recorder=, =slurp=, =ffmpeg=; optionally =hyprctl= or =swaymsg= for automatic active-window geometry.
 
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>

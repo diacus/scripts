@@ -1,23 +1,35 @@
 #+TITLE: laptop-keyboard
 #+MAN_CLASS_OPTIONS: :section-id 1
-#+DATE: 6 Abr 2025
-#+MAN_VERSION: version 0.1
+#+DATE: 5 Jul 2026
+#+MAN_VERSION: version 0.2
 #+OPTIONS: ^:{}
 
 * NAME
-laptop-keyboard - activa o desactiva el teclado de la laptop (X11)
+laptop-keyboard - activa o desactiva el teclado de la laptop (X11 / Wayland)
 
 * SYNOPSIS
 #+BEGIN_SRC sh
-laptop-keyboard [on|off]
+laptop-keyboard [--backend {x11,wayland}] [on|off]
 #+END_SRC
 
 * DESCRIPTION
 Controla cuando el teclado de la laptop está conectado o no a su
-dispositivo maestro.
+dispositivo maestro. El backend se auto-detecta desde =$XDG_SESSION_TYPE=;
+use =--backend= para forzarlo.
+
+- X11 :: flota (=off=) y reatacha (=on=) el teclado vía =xinput=.
+- Wayland :: escribe el atributo sysfs =inhibited= del kernel
+  (=/sys/.../input/inputN/inhibited=), compositor-agnóstico. Requiere
+  root (=sudo=) y kernel >= 5.10. El dispositivo objetivo es
+  ="AT Translated Set 2 keyboard"=, el mismo que el camino X11.
+
+* OPTIONS
+- on, off :: Habilita (=on=) o deshabilita (=off=) el teclado.
+- --backend :: Fuerza el backend =x11= o =wayland=. Por defecto se auto-detecta desde =$XDG_SESSION_TYPE=.
 
 * DEPENDENCIES
-xinput (X11)
+- X11 :: =xinput=.
+- Wayland :: =awk= + kernel >= 5.10 (atributo sysfs =inhibited=); requiere root.
 
 * AUTHOR
 Diacus Magnuz <diacus.magnuz@gmail.com>
